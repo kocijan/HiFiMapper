@@ -22,6 +22,8 @@ Install python requirements:
 pip install requirements.txt
 ```
 
+Download [data](https://drive.google.com/drive/folders/1agwq4nsYo649RzUhUuCPIfTOMc4C0dfO?usp=sharing).
+
 Run experiments in tests/benchmarks:
 ```
 python3.8 benchmark[1...].py
