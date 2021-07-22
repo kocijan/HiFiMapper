@@ -1,24 +1,27 @@
 // Copyright (c) 2021 Suzana Pratljacic
 
-#include <bitset>
-#include <cstdlib>
-#include <fstream>
-#include <getopt.h>
-#include <iostream>
-#include <omp.h>
-#include <stdint.h>
-#include <unistd.h>
 #include <unordered_set>
+#include <iostream>
+#include <fstream>
+#include <cstdlib>
+#include <cstdint>
+#include <vector>
+#include <thread>
+#include <random>
+#include <mutex>
+
+#include <unistd.h>
+#include <getopt.h>
+
+#include <omp.h>
+
+#include "mapper/suffix_array.hpp"
+#include "mapper/nucleic_acid.hpp"
+#include "mapper/chaining.hpp"
+#include "mapper/parser.hpp"
 
 #include "biosoup/timer.hpp"
-#include "chaining.hpp"
-#include "nucleic_acid.hpp"
-#include "parser_utility.hpp"
-#include "suffix_array.hpp"
-#include <mutex>
-#include <thread>
 
-namespace {
 
 void Help() {
   std::cout << "usage: ./HiFimapper [options ...] <target> [<sequences>]\n"
@@ -83,27 +86,19 @@ void Help() {
                "      prints the usage\n";
 }
 
-bool findChains(std::uint32_t query_id,
-                std::vector<std::vector<match>> &matches,
-                std::vector<std::vector<match>> &matches_complement,
-                std::vector<overlap> &result, int secondary_alignements,
-                double secondary_to_primary_ratio, int gap, int bandwidth,
-                int minimal_anchors) {
-  std::vector<overlap> overlaps;
+bool FindChains(std::vector<std::vector<mapper::Match>>& matches,
+                std::vector<std::vector<mapper::Match>>& matches_complement, std::vector<mapper::Overlap>& result,
+                const std::uint32_t secondary_alignements, const double secondary_to_primary_ratio,
+                const std::uint32_t gap, const std::uint32_t bandwidth, const std::uint32_t minimal_anchors) {
+  std::vector<mapper::Overlap> overlaps;
 
-  // for (auto v : matches) for (auto m : v) std::cerr << m << std::endl;
-  // for(auto v : matches_complement) for(auto m : v) std::cerr << m <<
-  // std::endl;
-
-  for (auto &m : matches) {
-    auto chains = chain(m, gap, bandwidth, minimal_anchors,
-                        secondary_to_primary_ratio, secondary_alignements);
+  for (auto& m : matches) {
+    auto chains = mapper::Chain(m, gap, bandwidth, minimal_anchors, secondary_to_primary_ratio, secondary_alignements);
     overlaps.insert(overlaps.end(), chains.begin(), chains.end());
   }
 
-  for (auto &m : matches_complement) {
-    auto chains = chain(m, gap, bandwidth, minimal_anchors,
-                        secondary_to_primary_ratio, secondary_alignements);
+  for (auto& m : matches_complement) {
+    auto chains = mapper::Chain(m, gap, bandwidth, minimal_anchors, secondary_to_primary_ratio, secondary_alignements);
     overlaps.insert(overlaps.end(), chains.begin(), chains.end());
   }
 
@@ -112,45 +107,37 @@ bool findChains(std::uint32_t query_id,
   }
 
   sort(overlaps.begin(), overlaps.end(),
-       [](const overlap &a, const overlap &b) -> bool {
-         return a.score > b.score;
-       });
+       [](const mapper::Overlap& a, const mapper::Overlap& b) -> bool { return a.score > b.score; });
   result.insert(result.end(), overlaps.begin(),
-                overlaps.size() >= secondary_alignements
-                    ? overlaps.begin() + secondary_alignements
-                    : overlaps.end());
+                overlaps.size() >= secondary_alignements ? overlaps.begin() + secondary_alignements : overlaps.end());
   return true;
 }
-
-} // namespace
 
 std::atomic<std::uint32_t> biosoup::NucleicAcid::num_objects{0};
 int biosoup::NucleicAcid::QUALITY_TRESHOLD = 90;
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
+  static struct option options[] = {{"threads", required_argument, nullptr, 't'},
+                                    {"sample-length", required_argument, nullptr, 'l'},
+                                    {"sample-count", required_argument, nullptr, 'c'},
+                                    {"min-match", required_argument, nullptr, 'm'},
+                                    {"quality", required_argument, nullptr, 'q'},
+                                    {"seed", required_argument, nullptr, 's'},
+                                    {"frequency", required_argument, nullptr, 'f'},
+                                    {"discard", no_argument, nullptr, 'd'},
+                                    {"extended-search", no_argument, nullptr, 'e'},
+                                    {"sequential", no_argument, nullptr, 'a'},
+                                    {"lcp-information", no_argument, nullptr, 'i'},
+                                    {"secondary-alignements", required_argument, nullptr, 'N'},
+                                    {"ratio", required_argument, nullptr, 'p'},
+                                    {"bandwidth", required_argument, nullptr, 'b'},
+                                    {"gap", required_argument, nullptr, 'g'},
+                                    {"minimal-anchors", required_argument, nullptr, 'n'},
+                                    {"lcp-search-size", required_argument, nullptr, 'x'},
+                                    {"help", no_argument, nullptr, 'h'},
+                                    {nullptr, 0, nullptr, 0}};
 
-  static struct option options[] = {
-      {"threads", required_argument, nullptr, 't'},
-      {"sample-length", required_argument, nullptr, 'l'},
-      {"sample-count", required_argument, nullptr, 'c'},
-      {"min-match", required_argument, nullptr, 'm'},
-      {"quality", required_argument, nullptr, 'q'},
-      {"seed", required_argument, nullptr, 's'},
-      {"frequency", required_argument, nullptr, 'f'},
-      {"discard", no_argument, nullptr, 'd'},
-      {"extended-search", no_argument, nullptr, 'e'},
-      {"sequential", no_argument, nullptr, 'a'},
-      {"lcp-information", no_argument, nullptr, 'i'},
-      {"secondary-alignements", required_argument, nullptr, 'N'},
-      {"ratio", required_argument, nullptr, 'p'},
-      {"bandwidth", required_argument, nullptr, 'b'},
-      {"gap", required_argument, nullptr, 'g'},
-      {"minimal-anchors", required_argument, nullptr, 'n'},
-      {"lcp-search-size", required_argument, nullptr, 'x'},
-      {"help", no_argument, nullptr, 'h'},
-      {nullptr, 0, nullptr, 0}};
-
-  srand(time(NULL));
+  srand(time(0UL));
 
   int threads = 8;
   int sample_length = 75;
@@ -173,66 +160,66 @@ int main(int argc, char **argv) {
   std::string tartget_path = "";
   std::string queries_path = "";
 
-  const char *optstr = "t:l:c:m:q:s:f:deaiuN:p:b:g:n:x:";
+  const char* optstr = "t:l:c:m:q:s:f:deaiuN:p:b:g:n:x:";
   char arg;
   while ((arg = getopt_long(argc, argv, optstr, options, 0)) != -1) {
     switch (arg) {
-    case 'd':
-      discard = true;
-      break;
-    case 'a':
-      sequential = true;
-      break;
-    case 'i':
-      lcp_information = true;
-      break;
-    case 'e':
-      extended_search = true;
-      break;
-    case 'b':
-      bandwidth = std::atoi(optarg);
-      break;
-    case 'N':
-      secondary_alignements = std::atoi(optarg);
-      break;
-    case 'n':
-      minimal_anchors = std::atoi(optarg);
-      break;
-    case 'p':
-      secondary_to_primary_ratio = std::stod(optarg);
-      break;
-    case 'g':
-      gap = std::atoi(optarg);
-      break;
-    case 't':
-      threads = std::atoi(optarg);
-      break;
-    case 'l':
-      sample_length = std::atoi(optarg);
-      break;
-    case 'c':
-      sample_count = std::atoi(optarg);
-      break;
-    case 's':
-      seed = std::atoi(optarg);
-      break;
-    case 'm':
-      min_match = std::stod(optarg);
-      break;
-    case 'q':
-      quality = std::atoi(optarg);
-      break;
-    case 'f':
-      frequency = std::atoi(optarg);
-      break;
-    case 'x':
-      lcp_search_size = std::atoi(optarg);
-      break;
-    case 'h':
-      Help();
-      return 0;
-    default:
-      return 1;
+      case 'd':
+        discard = true;
+        break;
+      case 'a':
+        sequential = true;
+        break;
+      case 'i':
+        lcp_information = true;
+        break;
+      case 'e':
+        extended_search = true;
+        break;
+      case 'b':
+        bandwidth = std::atoi(optarg);
+        break;
+      case 'N':
+        secondary_alignements = std::atoi(optarg);
+        break;
+      case 'n':
+        minimal_anchors = std::atoi(optarg);
+        break;
+      case 'p':
+        secondary_to_primary_ratio = std::stod(optarg);
+        break;
+      case 'g':
+        gap = std::atoi(optarg);
+        break;
+      case 't':
+        threads = std::atoi(optarg);
+        break;
+      case 'l':
+        sample_length = std::atoi(optarg);
+        break;
+      case 'c':
+        sample_count = std::atoi(optarg);
+        break;
+      case 's':
+        seed = std::atoi(optarg);
+        break;
+      case 'm':
+        min_match = std::stod(optarg);
+        break;
+      case 'q':
+        quality = std::atoi(optarg);
+        break;
+      case 'f':
+        frequency = std::atoi(optarg);
+        break;
+      case 'x':
+        lcp_search_size = std::atoi(optarg);
+        break;
+      case 'h':
+        Help();
+        return 0;
+      default:
+        return 1;
     }
   }
 
@@ -251,12 +238,12 @@ int main(int argc, char **argv) {
   }
   queries_path = argv[optind];
 
-  auto tparser = parser_utility::CreateParser(tartget_path);
+  const auto tparser = mapper::CreateParser(tartget_path);
   if (tparser == nullptr) {
     return 1;
   }
 
-  auto qparser = parser_utility::CreateParser(queries_path);
+  const auto qparser = mapper::CreateParser(queries_path);
   if (qparser == nullptr) {
     return 1;
   }
@@ -264,11 +251,10 @@ int main(int argc, char **argv) {
   biosoup::Timer timer{};
   timer.Start();
 
-  biosoup::NucleicAcid::num_objects = 0;
   std::vector<std::unique_ptr<biosoup::NucleicAcid>> targets;
   try {
     targets = tparser->Parse(-1);
-  } catch (std::invalid_argument &exception) {
+  } catch (std::invalid_argument& exception) {
     std::cerr << exception.what() << std::endl;
     return 1;
   }
@@ -278,20 +264,16 @@ int main(int argc, char **argv) {
     references[id] = *(targets[id].get());
   }
 
-  std::cerr << "[HiFimapper::] Loaded reference in " << timer.Stop()
-            << std::endl;
+  std::cerr << "[HiFimapper::] Loaded reference in " << timer.Stop() << std::endl;
   timer.Start();
-  std::cerr << "[HiFimapper::] Number of references: " << references.size()
-            << std::endl;
+  std::cerr << "[HiFimapper::] Number of references: " << references.size() << std::endl;
 
   std::cerr << "[HiFimapper::] Creating suffix array...\n";
 
-  auto suffixArray =
-      suffix_array::SequencesCollectionSuffixArray<biosoup::NucleicAcid>(
-          references, lcp_information, sample_length, lcp_search_size);
+  auto suffixArray = mapper::SequencesCollectionSuffixArray<biosoup::NucleicAcid>(references, lcp_information,
+                                                                                  sample_length, lcp_search_size);
 
-  std::cerr << "[HiFimapper::] Suffix array constructed in " << timer.Stop()
-            << std::endl;
+  std::cerr << "[HiFimapper::] Suffix array constructed in " << timer.Stop() << std::endl;
   timer.Start();
 
   std::default_random_engine random_engine;
@@ -309,11 +291,7 @@ int main(int argc, char **argv) {
         READ_ALL = true;
         return;
       }
-      while (true) {
-        if (queries.empty())
-          break;
-        sleep(0.001);
-      }
+
       mtx.lock();
       queries = std::move(records);
       mtx.unlock();
@@ -326,13 +304,12 @@ int main(int argc, char **argv) {
   double total_time = 0;
 
   while (true) {
-
     while (true) {
       mtx.lock();
-      if (!queries.empty())
+      if (!queries.empty()) {
         break;
+      }
       mtx.unlock();
-      sleep(0.001);
     }
     mtx.unlock();
 
@@ -342,39 +319,34 @@ int main(int argc, char **argv) {
       reads[id] = *(queries[id].get());
     }
 
-    std::cerr << "[HiFimapper::] Loaded queries in " << timer.Stop()
-              << std::endl;
-    std::cerr << "[HiFimapper::] Number of queries: " << queries.size()
-              << std::endl;
+    std::cerr << "[HiFimapper::] Loaded queries in " << timer.Stop() << std::endl;
+    std::cerr << "[HiFimapper::] Number of queries: " << queries.size() << std::endl;
     timer.Start();
 
-    std::vector<std::vector<std::vector<match>>> matches(
-        queries.size(), std::vector<std::vector<match>>());
-    std::vector<std::vector<std::vector<match>>> matches_complement(
-        queries.size(), std::vector<std::vector<match>>());
+    std::vector<std::vector<std::vector<mapper::Match>>> matches(queries.size(),
+                                                                 std::vector<std::vector<mapper::Match>>());
+    std::vector<std::vector<std::vector<mapper::Match>>> matches_complement(queries.size(),
+                                                                            std::vector<std::vector<mapper::Match>>());
 
     omp_set_dynamic(0);
 #pragma omp parallel for num_threads(T)
-    for (int q_id = 0; q_id < queries.size(); q_id++) {
-      auto &n = reads[q_id];
+    for (std::size_t q_id = 0; q_id < queries.size(); q_id++) {
+      auto& n = reads[q_id];
 
       if (!sequential) {
         std::uniform_int_distribution<int> position_distribution;
         if (lcp_information)
-          position_distribution = std::uniform_int_distribution<int>(
-              0, n.size() - sample_length - 10000);
+          position_distribution = std::uniform_int_distribution<int>(0, n.size() - sample_length - 10000UL);
         else
-          position_distribution = std::uniform_int_distribution<int>(
-              0, n.size() - sample_length - 1);
+          position_distribution = std::uniform_int_distribution<int>(0, n.size() - sample_length - 1);
 
         for (uint32_t i = 0; i < sample_count; i++) {
           std::uint32_t position = position_distribution(random_engine);
-          suffixArray.look(n, position, sample_length, matches[q_id], min_match,
-                           quality, frequency, discard, extended_search);
+          suffixArray.Look(n, position, sample_length, matches[q_id], min_match, quality, frequency, discard,
+                           extended_search);
 
           n.ReverseAndComplement();
-          suffixArray.look(n, position, sample_length, matches_complement[q_id],
-                           min_match, quality, frequency, discard,
+          suffixArray.Look(n, position, sample_length, matches_complement[q_id], min_match, quality, frequency, discard,
                            extended_search);
           n.ReverseAndComplement();
         }
@@ -383,14 +355,12 @@ int main(int argc, char **argv) {
           std::vector<std::uint32_t> new_positions;
           for (auto m : matches[q_id][0]) {
             for (auto p : suffixArray.positions[m.target_id][m.target_position])
-              if (p + m.query_position < n.size() - sample_length - 1)
-                new_positions.emplace_back(p + m.query_position);
+              if (p + m.query_position < n.size() - sample_length - 1) new_positions.emplace_back(p + m.query_position);
           }
 
           sort(new_positions.begin(), new_positions.end());
           for (int i = 0; i < new_positions.size(); i++) {
-            suffixArray.look(n, new_positions[i] - 2, sample_length,
-                             matches[q_id], min_match, quality, frequency,
+            suffixArray.Look(n, new_positions[i] - 2, sample_length, matches[q_id], min_match, quality, frequency,
                              discard, extended_search);
           }
 
@@ -404,22 +374,19 @@ int main(int argc, char **argv) {
           sort(new_positions_c.begin(), new_positions_c.end());
           n.ReverseAndComplement();
           for (int i = 0; i < new_positions_c.size(); i++) {
-            suffixArray.look(n, new_positions_c[i] - 2, sample_length,
-                             matches_complement[q_id], min_match, quality,
+            suffixArray.Look(n, new_positions_c[i] - 2, sample_length, matches_complement[q_id], min_match, quality,
                              frequency, discard, extended_search);
           }
           n.ReverseAndComplement();
         }
 
       } else {
-        for (uint32_t position = 0; position < n.size() - sample_length;
-             position += sample_length) {
-          suffixArray.look(n, position, sample_length, matches[q_id], min_match,
-                           quality, frequency, discard, extended_search);
+        for (uint32_t position = 0; position < n.size() - sample_length; position += sample_length) {
+          suffixArray.Look(n, position, sample_length, matches[q_id], min_match, quality, frequency, discard,
+                           extended_search);
           n.ReverseAndComplement();
 
-          suffixArray.look(n, position, sample_length, matches_complement[q_id],
-                           min_match, quality, frequency, discard,
+          suffixArray.Look(n, position, sample_length, matches_complement[q_id], min_match, quality, frequency, discard,
                            extended_search);
           n.ReverseAndComplement();
         }
@@ -427,22 +394,19 @@ int main(int argc, char **argv) {
     }
 
     auto searching_time = timer.Stop();
-    std::cerr << "[HiFimapper::] Batch search time: " << searching_time
-              << std::endl;
+    std::cerr << "[HiFimapper::] Batch search time: " << searching_time << std::endl;
     timer.Start();
     total_time += searching_time;
 
-    std::vector<std::vector<overlap>> overlaps(queries.size());
+    std::vector<std::vector<mapper::Overlap>> overlaps(queries.size());
     std::cerr << "[HiFimapper::] Start chaining...." << std::endl;
 
     std::vector<bool> unmapped_ids(queries.size());
 
 #pragma omp parallel for num_threads(T)
     for (int q_id = 0; q_id < queries.size(); q_id++) {
-      if (!findChains(q_id, matches[q_id], matches_complement[q_id],
-                      overlaps[q_id], secondary_alignements,
-                      secondary_to_primary_ratio, gap, bandwidth,
-                      minimal_anchors)) {
+      if (!FindChains(matches[q_id], matches_complement[q_id], overlaps[q_id], secondary_alignements,
+                      secondary_to_primary_ratio, gap, bandwidth, minimal_anchors)) {
         unmapped_ids[q_id] = true;
         ++unmapped;
       }
@@ -450,25 +414,20 @@ int main(int argc, char **argv) {
 
     auto chaining_time = timer.Stop();
 
-    std::cerr << "[HiFimapper::] Reads chained in " << chaining_time
-              << std::endl;
+    std::cerr << "[HiFimapper::] Reads chained in " << chaining_time << std::endl;
     total_time += chaining_time;
     timer.Start();
 
-    for (auto &a : overlaps) {
-      for (auto &o : a) {
+    for (auto& a : overlaps) {
+      for (auto& o : a) {
         std::string strain = o.reversed ? "-" : "+";
-        std::cout << reads[o.query_id].Name() << "\t"
-                  << reads[o.query_id].size() << "\t" << 0 << "\t"
-                  << reads[o.query_id].size() - 1 << "\t" << strain << "\t"
-                  << references[o.target_id].Name() << "\t"
-                  << references[o.target_id].size() << "\t"
-                  << o.target_start_position << "\t" << o.target_end_position
+        std::cout << reads[o.query_id].Name() << "\t" << reads[o.query_id].size() << "\t" << 0 << "\t"
+                  << reads[o.query_id].size() - 1 << "\t" << strain << "\t" << references[o.target_id].Name() << "\t"
+                  << references[o.target_id].size() << "\t" << o.target_start_position << "\t" << o.target_end_position
                   << "\t"
                   << "0"
                   << "\t"
-                  << std::max(o.target_end_position - o.target_start_position +
-                                  1,
+                  << std::max(o.target_end_position - o.target_start_position + 1,
                               o.query_end_position - o.query_start_position + 1)
                   << "\t" << 255 << "\n";
       }
@@ -477,17 +436,14 @@ int main(int argc, char **argv) {
     mtx.lock();
     queries.erase(queries.begin(), queries.end());
     mtx.unlock();
-    if (READ_ALL)
-      break;
+    if (READ_ALL) break;
   }
 
   reader.join();
 
   timer.Stop();
-  std::cerr << std::fixed << "[HiFiMapper::] Mapping time: " << total_time
-            << std::endl;
+  std::cerr << std::fixed << "[HiFiMapper::] Mapping time: " << total_time << std::endl;
   std::cerr << "[HiFiMapper::] Unmapped: " << unmapped << std::endl;
-  std::cerr << "[HiFiMapper::] Real time: " << timer.elapsed_time() << "s"
-            << std::endl;
+  std::cerr << "[HiFiMapper::] Real time: " << timer.elapsed_time() << "s" << std::endl;
   return 0;
 }

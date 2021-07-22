@@ -3,10 +3,12 @@
 #include <regex>
 #include <sys/time.h>
 
-#include "biosoup/overlap.hpp"
 #include "bioparser/paf_parser.hpp"
 #include "bioparser/parser.hpp"
-#include "parser.hpp"
+#include "biosoup/sequence.hpp"
+#include "biosoup/overlap.hpp"
+
+#include "parser/parser.hpp"
 
 struct PafOverlap {
  public:
@@ -18,8 +20,7 @@ struct PafOverlap {
       char orientation,
       const char* t_name, std::uint32_t t_name_len,
       std::uint32_t t_len,
-      std::uint32_t t_begin,
-      std::uint32_t t_end,
+      std::uint32_t t_begin, std::uint32_t t_end,
       std::uint32_t score,
       std::uint32_t overlap_len,
       std::uint32_t quality)
@@ -120,7 +121,7 @@ void train(biosoup::Sequence& reference, std::string& subreads_path, std::string
   
   std::unordered_map<std::string, biosoup::Sequence> reads;
   biosoup::Sequence::num_objects = 0;
-  auto mparser = simulator_utility::CreateParser(subreads_path);
+  auto mparser = sim::parser::CreateParser(subreads_path);
   auto reads_pointers = mparser->Parse(-1);
   for (auto id=0; id < reads_pointers.size(); id++){
     biosoup::Sequence s = *(reads_pointers[id].get());
@@ -276,7 +277,7 @@ void extractErrorModel(biosoup::Sequence &reference, std::uint32_t position,
         quality_sum += reference.quality[i];
 
     double deletion_probability =
-        pow(10, -1 * (quality_sum / (NEIGH_SIZE * 2 + 1) - 33) / 10);
+        pow(10, -1 * (1.0 * quality_sum / (NEIGH_SIZE * 2 + 1) - 33) / 10);
 
     if (error_distribution(gene) <= deletion_probability) {
       sequence_index++;
@@ -286,7 +287,7 @@ void extractErrorModel(biosoup::Sequence &reference, std::uint32_t position,
     // substitution and insertion error probability is defined by the quality
     // score at the position
     double error_probability =
-        pow(10, -1 * (reference.quality[sequence_index] - 33) / 10);
+        pow(10, -1.0 * (reference.quality[sequence_index] - 33) / 10);
     // NO ERROR
     if (error_distribution(gene) > error_probability) {
       read += reference.data[sequence_index];
@@ -518,7 +519,7 @@ int main(int argc, char **argv) {
   }
 
   biosoup::Sequence::num_objects = 0;
-  auto rparser = simulator_utility::CreateParser(reference_path);
+  auto rparser = sim::parser::CreateParser(reference_path);
   auto ref_pointers = rparser->Parse(-1);
   biosoup::Sequence reference = *(ref_pointers[0].get());
 
