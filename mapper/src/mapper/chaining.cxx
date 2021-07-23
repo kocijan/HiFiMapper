@@ -52,7 +52,8 @@ std::vector<Overlap> Chain(std::vector<Match>& matches, const std::uint32_t gap,
     predecessors[i] = i;
 
     if (i > 0U) {
-      for (std::uint32_t j = i - 1U; i - j <= bandwidth; j--) {
+      for (std::uint32_t band = 1U; band <= i && band <= bandwidth; ++band) {
+        auto const j = i - band;
         const auto& m2 = matches[j];
         std::uint32_t query_dist = (m1.query_position + m1.match_size - 1U) - (m2.query_position + m2.match_size - 1U);
         std::uint32_t target_dist =

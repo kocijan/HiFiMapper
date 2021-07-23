@@ -5,11 +5,12 @@
 #ifndef MAPPER_NUCLEIC_ACID_HPP_
 #define MAPPER_NUCLEIC_ACID_HPP_
 
+#include <memory_resource>
 #include <algorithm>
 #include <stdexcept>
-#include <cstdint>
-#include <numeric>
+#include <cstdint> #include <numeric>
 #include <string>
+#include <memory>
 #include <vector>
 #include <atomic>
 #include <limits>
@@ -68,7 +69,7 @@ class NucleicAcid {
     deflated_quality.reserve(static_cast<std::size_t>(1. * quality_len / 64 + .999));
     std::uint64_t block = 0;
     for (std::uint32_t i = 0; i < quality_len; ++i) {
-      std::uint32_t c = (quality[i] - '!') < QUALITY_TRESHOLD ? 0 : 1;
+      std::uint32_t c = (quality[i] - '!') < kQualityThreshold ? 0 : 1;
       block = block << 1UL | c;
       if ((i + 1) % 64 == 0 || i == quality_len - 1) {
         deflated_quality.emplace_back(block);
@@ -84,8 +85,6 @@ class NucleicAcid {
   NucleicAcid& operator=(NucleicAcid&&) = default;
 
   ~NucleicAcid() = default;
-
-  std::uint64_t operator[](std::uint32_t index) { return Code(index); }
 
   std::uint32_t size() const { return inflated_len; }
 
@@ -119,21 +118,19 @@ class NucleicAcid {
     return dst;
   }
 
-  // ???
-  std::uint32_t position(std::uint32_t index) {
-    // to allow offset
-    return index;
-  }
-
   std::string InflateQuality(std::uint32_t i = 0,
                              std::uint32_t len = -1) const {  // NOLINT
-    if (deflated_quality.empty() || i >= inflated_len) return std::string{};
+    if (deflated_quality.empty() || i >= inflated_len) {
+      return std::string{};
+    }
 
     len = std::min(len, inflated_len - i);
 
     std::string dst{};
     dst.reserve(len);
-    for (; len; ++i, --len) dst += Score(i) ? '~' : '!';
+    for (; len; ++i, --len) {
+      dst += Score(i) ? '~' : '!';
+    }
     return dst;
   }
 
@@ -146,12 +143,14 @@ class NucleicAcid {
   std::string const& Name() const noexcept { return name; }
 
   static std::atomic<std::uint32_t> num_objects;
-  static int QUALITY_TRESHOLD;  // Phred quality treshold
+  static int kQualityThreshold;  // Phred quality treshold
 
   std::uint32_t id;
   std::string name;
-  std::vector<std::uint64_t> deflated_data;
-  std::vector<std::uint64_t> deflated_quality;
+
+  std::pmr::vector<std::uint64_t> deflated_data;
+  std::pmr::vector<std::uint64_t> deflated_quality;
+
   std::uint32_t inflated_len;
   bool is_reverse_complement;
 };

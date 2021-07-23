@@ -1,5 +1,6 @@
 // Copyright (c) 2021 Suzana Pratljacic
 
+#include <memory_resource>
 #include <unordered_set>
 #include <iostream>
 #include <fstream>
@@ -22,10 +23,8 @@
 
 #include "biosoup/timer.hpp"
 
-
 void Help() {
-  std::cout << "usage: ./HiFimapper [options ...] <target> [<sequences>]\n"
-               "  # default output is stdout\n"
+  std::cout << "usage: ./HiFimapper [options ...] <target> [<sequences>]\n" "  # default output is stdout\n"
                "  <target>\n"
                "    path to the targets in FASTA/FASTQ format\n"
                "  <sequences>\n"
@@ -33,7 +32,7 @@ void Help() {
                "\n"
                "  options:\n"
                "    -t, --threads <int>l\n"
-               "      defaul: 8"
+               "      defaul: std::thread::hardware_concurrency() / 2"
                "      number of threads\n "
                "    -l, --sample-_length <int>\n"
                "      default: 50\n"
@@ -114,7 +113,7 @@ bool FindChains(std::vector<std::vector<mapper::Match>>& matches,
 }
 
 std::atomic<std::uint32_t> biosoup::NucleicAcid::num_objects{0};
-int biosoup::NucleicAcid::QUALITY_TRESHOLD = 90;
+int biosoup::NucleicAcid::kQualityThreshold = 90;
 
 int main(int argc, char** argv) {
   static struct option options[] = {{"threads", required_argument, nullptr, 't'},
@@ -139,7 +138,7 @@ int main(int argc, char** argv) {
 
   srand(time(0UL));
 
-  int threads = 8;
+  int threads = std::thread::hardware_concurrency() / 2;
   int sample_length = 75;
   int sample_count = 20;
   double min_match = 0;
@@ -223,8 +222,13 @@ int main(int argc, char** argv) {
     }
   }
 
-  int T = threads - 1;
-  biosoup::NucleicAcid::QUALITY_TRESHOLD = quality;
+  omp_set_dynamic(0);
+  omp_set_num_threads(threads);
+  biosoup::NucleicAcid::kQualityThreshold = quality;
+
+  // Experimental
+  std::pmr::synchronized_pool_resource pool{};
+  std::pmr::set_default_resource(&pool);
 
   if (argc == 1 || optind == argc) {
     std::cerr << "[HiFimapper::] error: missing target file" << std::endl;
@@ -314,7 +318,7 @@ int main(int argc, char** argv) {
     mtx.unlock();
 
     std::vector<biosoup::NucleicAcid> reads(queries.size());
-#pragma omp parallel for num_threads(T)
+#pragma omp parallel for
     for (auto id = 0; id < queries.size(); id++) {
       reads[id] = *(queries[id].get());
     }
@@ -329,7 +333,7 @@ int main(int argc, char** argv) {
                                                                             std::vector<std::vector<mapper::Match>>());
 
     omp_set_dynamic(0);
-#pragma omp parallel for num_threads(T)
+#pragma omp parallel for
     for (std::size_t q_id = 0; q_id < queries.size(); q_id++) {
       auto& n = reads[q_id];
 
@@ -403,7 +407,7 @@ int main(int argc, char** argv) {
 
     std::vector<bool> unmapped_ids(queries.size());
 
-#pragma omp parallel for num_threads(T)
+#pragma omp parallel for
     for (int q_id = 0; q_id < queries.size(); q_id++) {
       if (!FindChains(matches[q_id], matches_complement[q_id], overlaps[q_id], secondary_alignements,
                       secondary_to_primary_ratio, gap, bandwidth, minimal_anchors)) {

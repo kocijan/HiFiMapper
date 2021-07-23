@@ -53,7 +53,7 @@ void LookSa(T& query, const std::uint32_t position, const std::uint32_t size, st
       continue;
     }
 
-    const auto pattern = query[position + matched_size];
+    const auto pattern = query.Code(position + matched_size);
     const auto er = std::equal_range(sa.begin() + lo, sa.begin() + hi, pattern, detail::Cmp(sequence, matched_size));
 
     if (er.first == er.second) {

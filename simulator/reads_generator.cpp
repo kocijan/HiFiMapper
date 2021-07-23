@@ -52,7 +52,7 @@ struct PafOverlap {
 };
 
 // taken from Petar Velickovic github
-inline int needleman_wunsch(const std::string &sequence1,
+inline int NeedlemanWunsch(const std::string &sequence1,
                             const std::string &sequence2,
                             std::vector<std::vector<int>> &dp, int match_score,
                             int mismatch_score, int gap_score) {
@@ -72,7 +72,7 @@ inline int needleman_wunsch(const std::string &sequence1,
 }
 
 inline std::pair<std::string, std::string>
-get_optimal_alignment(const std::string &sequence1,
+GetOptimalAlignment(const std::string &sequence1,
                       const std::string &sequence2,
                       std::vector<std::vector<int>> &dp, int match_score,
                       int mismatch_score, int gap_score) {
@@ -117,7 +117,7 @@ get_optimal_alignment(const std::string &sequence1,
   return make_pair(retA, retB);
 }
 
-void train(biosoup::Sequence& reference, std::string& subreads_path, std::string& paf_path){
+void Train(biosoup::Sequence& reference, std::string& subreads_path, std::string& paf_path){
   
   std::unordered_map<std::string, biosoup::Sequence> reads;
   biosoup::Sequence::num_objects = 0;
@@ -150,10 +150,10 @@ void train(biosoup::Sequence& reference, std::string& subreads_path, std::string
       std::string sequence2 = value.data.substr(overlap.q_begin, overlap.q_end - overlap.q_begin);
       int vel = std::max(sequence1.size(), sequence2.size()) + 1;
       std::vector<std::vector<int>> dp (vel, std::vector<int>(vel, 0));
-      double score = needleman_wunsch(sequence1, sequence2, dp, 1, 0, 0) / (double) (vel-1);
+      double score = NeedlemanWunsch(sequence1, sequence2, dp, 1, 0, 0) / (double) (vel-1);
     
       if (score > treshold){
-        std::pair<std::string, std::string> align = get_optimal_alignment(sequence1, sequence2, dp, 1, 0, 0);
+        std::pair<std::string, std::string> align = GetOptimalAlignment(sequence1, sequence2, dp, 1, 0, 0);
         std::uint32_t ref_pos = overlap.t_begin;
         std::uint32_t query_pos = overlap.q_begin;
         for(auto i = 0; i < align.first.size() && i < align.second.size(); i++){
@@ -195,7 +195,7 @@ void train(biosoup::Sequence& reference, std::string& subreads_path, std::string
   reference.quality = retQuality;
 }
 
-void complement(std::string &read, std::string &quality) {
+void Complement(std::string &read, std::string &quality) {
   for (auto &it : read) {
     switch (static_cast<char>(std::toupper(static_cast<unsigned char>(it)))) {
     case 'A':
@@ -247,7 +247,7 @@ void complement(std::string &read, std::string &quality) {
   std::reverse(quality.begin(), quality.end());
 }
 
-void extractErrorModel(biosoup::Sequence &reference, std::uint32_t position,
+void ExtractErrorModel(biosoup::Sequence &reference, std::uint32_t position,
                        std::uint32_t read_length,
                        std::default_random_engine &gene, std::string &read,
                        std::string &quality) {
@@ -373,7 +373,7 @@ void extractErrorUniform(biosoup::Sequence &reference, std::uint32_t position,
   }
 }
 
-void generateReads(biosoup::Sequence &reference, std::uint32_t read_length,
+void GenerateReads(biosoup::Sequence &reference, std::uint32_t read_length,
                    std::uint32_t num_reads, float complement_probability,
                    std::uint32_t SEED, double error_probability = 0) {
 
@@ -395,13 +395,13 @@ void generateReads(biosoup::Sequence &reference, std::uint32_t read_length,
     std::string quality;
 
     if (error_model)
-      extractErrorModel(reference, position, read_length, gene, read, quality);
+      ExtractErrorModel(reference, position, read_length, gene, read, quality);
     else
       extractErrorUniform(reference, position, read_length, gene, read, quality,
                           error_probability);
 
     if (complement_distribution(gene) < complement_probability){
-      complement(read, quality);
+      Complement(read, quality);
       reversed = true;
     }
 
@@ -528,8 +528,8 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  if (model) train(reference, subreads_path, paf_path);
+  if (model) Train(reference, subreads_path, paf_path);
 
-  generateReads(reference, read_length, num_reads, complement_probability, seed,
+  GenerateReads(reference, read_length, num_reads, complement_probability, seed,
                 error_probability);
 }
