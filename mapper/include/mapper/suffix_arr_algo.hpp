@@ -1,5 +1,12 @@
+#ifndef MAPPER_SUFFIX_ARR_ALGO_HPP_
+#define MAPPER_SUFFIX_ARR_ALGO_HPP_
+
+#include <cstdlib>
+#include <string>
+#include <vector>
+#include <ctime>
+
 #include "biosoup/timer.hpp"
-#include <bits/stdc++.h>
 
 // Suffix array and lcp in O(n)
 // Taken from "Two Efficient Algorithms for Linear Suffix Array
@@ -14,7 +21,7 @@
 #define isLMS(i) (i > 0 && tget(i) && !tget(i - 1))
 
 // find the start or end of each bucket
-void getBuckets(unsigned char *s, int *bkt, int n, int K, int cs, bool end) {
+inline void getBuckets(unsigned char *s, int *bkt, int n, int K, int cs, bool end) {
   int i, sum = 0;
   for (i = 0; i <= K; i++)
     bkt[i] = 0; // clear all buckets
@@ -27,7 +34,7 @@ void getBuckets(unsigned char *s, int *bkt, int n, int K, int cs, bool end) {
 }
 
 // compute SAl
-void induceSAl(unsigned char *t, int *SA, unsigned char *s, int *bkt, int n,
+inline void induceSAl(unsigned char *t, int *SA, unsigned char *s, int *bkt, int n,
                int K, int cs, bool end) {
   int i, j;
   getBuckets(s, bkt, n, K, cs, end); // find starts of buckets
@@ -39,7 +46,7 @@ void induceSAl(unsigned char *t, int *SA, unsigned char *s, int *bkt, int n,
 }
 
 // compute SAs
-void induceSAs(unsigned char *t, int *SA, unsigned char *s, int *bkt, int n,
+inline void induceSAs(unsigned char *t, int *SA, unsigned char *s, int *bkt, int n,
                int K, int cs, bool end) {
   int i, j;
   getBuckets(s, bkt, n, K, cs, end); // find ends of buckets
@@ -47,14 +54,13 @@ void induceSAs(unsigned char *t, int *SA, unsigned char *s, int *bkt, int n,
     j = SA[i] - 1;
     if (j >= 0 && tget(j))
       SA[--bkt[chr(j)]] = j;
-  }
-}
+  } }
 
 // find the suffix array SA of s[0..n-1] in {1..K}^n
 // require s[n-1]=0 (the sentinel!), n>=2
 // use a working space (excluding s and SA) of at most 2.25n+O(1) for a constant
 // alphabet
-void SA_IS(unsigned char *s, int *SA, int n, int K, int cs) {
+inline void SA_IS(unsigned char *s, int *SA, int n, int K, int cs) {
   int i, j;
   unsigned char *t =
       (unsigned char *)malloc(n / 8 + 1); // LS-type array in bits
@@ -173,3 +179,5 @@ template <typename T> std::vector<uint32_t> suffix_array_linear(T &seq) {
   sa.erase(sa.begin());
   return std::vector<std::uint32_t>(sa.begin(), sa.end());
 }
+
+#endif /* MAPPER_SUFFIX_ARR_ALGO_HPP_ */

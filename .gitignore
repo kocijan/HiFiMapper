@@ -9,3 +9,6 @@ __pycache__
 .vscode/
 env/
 data/
+
+.cache
+compile_commands.json
