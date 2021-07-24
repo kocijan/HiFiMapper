@@ -4,6 +4,7 @@
 #include <unordered_set>
 #include <iostream>
 #include <iterator>
+#include <memory>
 #include <limits>
 
 #include "mapper/suffix_arr_algo.hpp"
@@ -111,9 +112,8 @@ class SequencesCollectionSuffixArray {
     }
   }
 
-  void look(T& query, std::uint32_t position, std::uint32_t size, std::vector<std::vector<Match>>& result,
+  void look(T& query, std::uint32_t position, std::uint32_t size, std::vector<std::vector<Match>> result,
             double min_match, int quality, int RANGE_SIZE, bool discard, bool extended_search) {
-    if (result.size() == 0) result = std::vector<std::vector<Match>>(number_of_sequences, std::vector<Match>());
 
     for (std::uint32_t sequence_index = 0; sequence_index < number_of_sequences; sequence_index++)
       lookSa<T>(query, position, size, result[sequence_index], suffix_arrays[sequence_index], sequences[sequence_index],

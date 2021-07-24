@@ -1,3 +1,5 @@
+// Copyright (c) 2021 Suzana Pratljacic
+
 #include <unordered_set>
 #include <iostream>
 #include <fstream>
@@ -330,10 +332,10 @@ int main(int argc, char** argv) {
     std::cerr << "[HiFimapper::] Number of queries: " << queries.size() << std::endl;
     timer.Start();
 
-    std::vector<std::vector<std::vector<mapper::Match>>> matches(queries.size(),
-                                                                 std::vector<std::vector<mapper::Match>>());
-    std::vector<std::vector<std::vector<mapper::Match>>> matches_complement(queries.size(),
-                                                                            std::vector<std::vector<mapper::Match>>());
+    const std::vector<std::vector<mapper::Match>> helper_vec(references.size(), std::vector<mapper::Match>());
+
+    std::vector<std::vector<std::vector<mapper::Match>>> matches(queries.size(), helper_vec);
+    std::vector<std::vector<std::vector<mapper::Match>>> matches_complement(queries.size(), helper_vec);
 
 #pragma omp parallel
     for (int q_id = 0; q_id < queries.size(); q_id++) {
