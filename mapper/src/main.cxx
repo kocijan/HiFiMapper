@@ -1,6 +1,7 @@
 // Copyright (c) 2021 Suzana Pratljacic
 
 #include <unordered_set>
+#include <stdexcept>
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
@@ -26,9 +27,7 @@ void Help() {
   std::cout << "usage: ./HiFimapper [options ...] <target> [<sequences>]\n"
                "  # default output is stdout\n"
                "  <target>\n"
-               "    path to the targets in FASTA/FASTQ format\n"
-               "  <sequences>\n"
-               "    path to the queries in FASTA/FASTQ format\n"
+               "    path to the targets in FASTA/FASTQ format\n" "  <sequences>\n" "    path to the queries in FASTA/FASTQ format\n"
                "\n"
                "  options:\n"
                "    -t, --threads <int>l\n"
@@ -227,6 +226,16 @@ int main(int argc, char** argv) {
         return 1;
     }
   }
+    
+  std::pmr::pool_options pool_options;
+  pool_options.largest_required_pool_block = 25001 / 32. + .999;
+  pool_options.max_blocks_per_chunk = 100000;
+
+  std::pmr::unsynchronized_pool_resource pool(pool_options);
+  biosoup::set_sequence_mem_src(std::pmr::get_default_resource());
+
+  // TODO: check for number of threads
+  const auto omp_threads = threads - 1;
 
   omp_set_dynamic(0);
   omp_set_num_threads(threads);
@@ -300,7 +309,7 @@ int main(int argc, char** argv) {
       }
       while (true) {
         if (queries.empty()) break;
-        sleep(0.001);
+        sleep(0.001); // doesn't really sleep
       }
       mtx.lock();
       queries = std::move(records);
@@ -323,7 +332,7 @@ int main(int argc, char** argv) {
     mtx.unlock();
 
     std::vector<biosoup::NucleicAcid> reads(queries.size());
-#pragma omp parallel for
+#pragma omp parallel for num_threads(omp_threads) 
     for (auto id = 0; id < queries.size(); id++) {
       reads[id] = *(queries[id].get());
     }
@@ -337,7 +346,7 @@ int main(int argc, char** argv) {
     std::vector<std::vector<std::vector<mapper::Match>>> matches(queries.size(), helper_vec);
     std::vector<std::vector<std::vector<mapper::Match>>> matches_complement(queries.size(), helper_vec);
 
-#pragma omp parallel
+#pragma omp parallel for num_threads(omp_threads)
     for (int q_id = 0; q_id < queries.size(); q_id++) {
       auto& n = reads[q_id];
 
@@ -411,7 +420,7 @@ int main(int argc, char** argv) {
 
     std::vector<std::uint8_t> unmapped_ids(queries.size());
 
-#pragma omp parallel for
+#pragma omp parallel for num_threads(omp_threads)
     for (int q_id = 0; q_id < queries.size(); q_id++) {
       if (!FindChains(q_id, matches[q_id], matches_complement[q_id], overlaps[q_id], secondary_alignements,
                       secondary_to_primary_ratio, gap, bandwidth, minimal_anchors)) {
@@ -420,14 +429,14 @@ int main(int argc, char** argv) {
       }
     }
 
-    auto chaining_time = timer.Stop();
+    const auto chaining_time = timer.Stop();
 
     std::cerr << "[HiFimapper::] Reads chained in " << chaining_time << std::endl;
     total_time += chaining_time;
     timer.Start();
 
-    for (auto& a : overlaps) {
-      for (auto& o : a) {
+    for (const auto& a : overlaps) {
+      for (const auto& o : a) {
         std::string strain = o.reversed ? "-" : "+";
         std::cout << reads[o.query_id].Name() << "\t" << reads[o.query_id].size() << "\t" << 0 << "\t"
                   << reads[o.query_id].size() - 1 << "\t" << strain << "\t" << references[o.target_id].Name() << "\t"

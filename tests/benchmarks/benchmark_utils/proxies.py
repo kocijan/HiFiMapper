@@ -9,7 +9,7 @@ import inspect
 
 
 WORK_DIRECTORY = Path(os.path.dirname(__file__))
-EXE_DIRECTORY = WORK_DIRECTORY.parents[2].joinpath("exe")
+EXE_DIRECTORY = WORK_DIRECTORY.parents[2].joinpath("build/bin")
 RESULTS_DIRECTORY = WORK_DIRECTORY.parents[0].joinpath("results")
 DATA_DIRECTORY = WORK_DIRECTORY.parents[0].joinpath("data")
 

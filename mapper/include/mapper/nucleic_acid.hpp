@@ -1,10 +1,10 @@
 // Copyright (c) 2020 Robert Vaser
-
 // taken from Biosoup
 
 #ifndef NUCLEIC_ACID_HPP_
 #define NUCLEIC_ACID_HPP_
 
+#include <memory_resource>
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
@@ -15,6 +15,7 @@
 #include <vector>
 
 namespace biosoup {
+
 constexpr static std::uint8_t kNucleotideCoder[] = {
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
@@ -24,6 +25,21 @@ constexpr static std::uint8_t kNucleotideCoder[] = {
     0,   255, 255, 255, 0,   1,   3,   3,   2,   0,   255, 3,   255, 255, 255, 255, 255, 255};
 
 constexpr static char kNucleotideDecoder[] = {'A', 'C', 'G', 'T'};
+
+namespace detail {
+
+static std::atomic<std::pmr::memory_resource*> sequence_mem_src = std::pmr::get_default_resource();
+
+}
+
+
+inline std::pmr::memory_resource* get_sequence_mem_src() {
+  return detail::sequence_mem_src.load();
+}
+
+inline std::pmr::memory_resource* set_sequence_mem_src(std::pmr::memory_resource* r) {
+  return detail::sequence_mem_src.exchange(r);
+}
 
 class NucleicAcid {
  public:
@@ -35,8 +51,8 @@ class NucleicAcid {
   NucleicAcid(const char* name, std::uint32_t name_len, const char* data, std::uint32_t data_len)
       : id(num_objects++),
         name(name, name_len),
-        deflated_data(),
-        deflated_quality(),
+        deflated_data(get_sequence_mem_src()),
+        deflated_quality(get_sequence_mem_src()),
         inflated_len(data_len),
         is_reverse_complement(0) {
     deflated_data.reserve(data_len / 32. + .999);
@@ -138,8 +154,8 @@ class NucleicAcid {
 
   std::uint32_t id;
   std::string name;
-  std::vector<std::uint64_t> deflated_data;
-  std::vector<std::uint64_t> deflated_quality;
+  std::pmr::vector<std::uint64_t> deflated_data;
+  std::pmr::vector<std::uint64_t> deflated_quality;
   std::uint32_t inflated_len;
   bool is_reverse_complement;
 };

@@ -20,7 +20,5 @@ target_link_libraries(mapper PRIVATE
   OpenMP::OpenMP_CXX
 )
 
-# set_target_default_warnings(mapper PRIVATE FALSE)
+set_target_default_warnings(mapper PRIVATE FALSE)
 
-target_compile_options(mapper INTERFACE -fprofile-instr-generate -fcoverage-mapping -O0 -g -fsanitize=thread)
-target_link_libraries(mapper INTERFACE -fprofile-instr-generate -fcoverage-mapping -fsanitize=thread)

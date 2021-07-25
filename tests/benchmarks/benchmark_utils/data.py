@@ -1,9 +1,5 @@
 from pathlib import Path
-import urllib.request
-import shutil
 import os
-import requests
-
 
 WORK_DIRECTORY = Path(os.path.dirname(__file__))
 
