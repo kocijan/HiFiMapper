@@ -1,0 +1,13 @@
+build/
+exe/
+__pycache__/*
+results/
+minimap2/
+Winnowmap/
+*.paf
+__pycache__
+.vscode/
+env/
+data/
+compile_commands.json
+.cache
