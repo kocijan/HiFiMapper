@@ -1,4 +1,4 @@
-# diplomski
+# HiFiMapper
 
 ```
 git clone https://github.com/SuzanaPratljacic/HiFiMapper.git && cd HiFiMapper && mkdir build && cd build
