@@ -1,0 +1,2 @@
+#!/bin/bash
+cat /home/mjkocijan/hifimapper/HiFiMapper/tests/benchmarks/data/sd_0001.maf | egrep "^s " | grep "ref" | tr -s ' ' | cut -d " " -f 3,4,5 > /home/mjkocijan/hifimapper/HiFiMapper/tests/benchmarks/data/sd_0001.info

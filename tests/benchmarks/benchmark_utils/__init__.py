@@ -12,4 +12,4 @@ from benchmark_utils.evaluator import PafEvaluator, RealEvaluator
 
 from benchmark_utils.utils import get_instructions
 
-from benchmark_utils.data import CHROMOSOME_13_READS, CHROMOSOME_13_REFERENCE, CHROMOSOME_19_READS, CHROMOSOME_19_REFERENCE
+from benchmark_utils.data import CHROMOSOME_13_READS, CHROMOSOME_13_REFERENCE, CHROMOSOME_19_READS, CHROMOSOME_19_REFERENCE, CHROMOSOME_13_GEN_READS

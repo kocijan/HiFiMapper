@@ -17,8 +17,8 @@ def evalf(sample_length, sample_count):
     min_match=0, frequency=1, lcp_information=True, lcp_search_size = 5000)
     evalutor = PafEvaluator(str(resh), str(reads))
     print(comm)
-    print([evalutor.correct / evalutor.total, int(resh.get_unmapped()), round(float(resh.get_mapping_time()), 2)])
-    return [evalutor.correct / evalutor.total, int(resh.get_unmapped()), round(float(resh.get_mapping_time()), 2)]
+    print([evalutor.correct / (evalutor.total + 0.001), int(resh.get_unmapped()), round(float(resh.get_mapping_time()), 2)])
+    return [evalutor.correct / (evalutor.total + 0.001), int(resh.get_unmapped()), round(float(resh.get_mapping_time()), 2)]
 
 
 print( 

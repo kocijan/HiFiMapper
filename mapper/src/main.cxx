@@ -22,7 +22,6 @@
 
 #include "biosoup/timer.hpp"
 
-
 void Help() {
   std::cout << "usage: ./HiFimapper [options ...] <target> [<sequences>]\n"
                "  # default output is stdout\n"
@@ -270,7 +269,7 @@ int main(int argc, char** argv) {
 
   std::cerr << "[HiFimapper::] Creating suffix array...\n";
 
-  auto suffixArray = mapper::SequencesCollectionSuffixArray<biosoup::NucleicAcid>(references, lcp_information,
+  auto suffixArray = mapper::SequencesCollectionSuffixArray<biosoup::NucleicAcid>(references, true,
                                                                                   sample_length, lcp_search_size);
 
   std::cerr << "[HiFimapper::] Suffix array constructed in " << timer.Stop() << std::endl;
@@ -286,7 +285,7 @@ int main(int argc, char** argv) {
   auto func = [&]() {
     while (true) {
       biosoup::NucleicAcid::num_objects = 0;
-      auto records = qparser->Parse(1ULL << 28);
+      auto records = qparser->Parse(1ULL << 31);
       if (records.size() == 0) {
         READ_ALL = true;
         return;
@@ -331,6 +330,7 @@ int main(int argc, char** argv) {
     omp_set_dynamic(0);
 #pragma omp parallel for num_threads(T)
     for (std::size_t q_id = 0; q_id < queries.size(); q_id++) {
+      std::cerr << "[HiFimapper::] Query " << q_id << " matching started\n";
       auto& n = reads[q_id];
 
       if (!sequential) {
@@ -391,20 +391,24 @@ int main(int argc, char** argv) {
           n.ReverseAndComplement();
         }
       }
+      std::cerr << "[HiFimapper::] Query " << q_id << " matching finished\n";
     }
 
     auto searching_time = timer.Stop();
 
     std::cerr << "[HiFimapper::]" << matches[0][0].size() << std::endl;
 
-    for (std::size_t q_id = 0; q_id < queries.size(); q_id++)
-    {
-        for (auto m : matches[q_id][0])
-    {
-        std::cerr << "[HiFimapper::] " << m.query_id << " " << m.target_id << " " << m.query_position << " " << m.target_position << " " << m.match_size << std::endl;
+    for (std::size_t q_id = 0; q_id < queries.size(); q_id++) {
+      std::cerr << "[HiFimapper::] Query " << q_id << " matches: " << matches[q_id][0].size() << std::endl;
+      for (auto m : matches[q_id][0]) {
+        std::cerr << "[HiFimapper::] " << m.query_id << " " << m.target_id << " " << m.query_position << " "
+                  << m.target_position << " " << m.match_size << " +" << std::endl;
+      }
+      for (auto m : matches_complement[q_id][0]) {
+        std::cerr << "[HiFimapper::] " << m.query_id << " " << m.target_id << " " << m.query_position << " "
+                  << m.target_position << " " << m.match_size << " -" << std::endl;
+      }
     }
-    }
-    
 
     std::cerr << "[HiFimapper::] Batch search time: " << searching_time << std::endl;
     timer.Start();
@@ -417,11 +421,13 @@ int main(int argc, char** argv) {
 
 #pragma omp parallel for num_threads(T)
     for (int q_id = 0; q_id < queries.size(); q_id++) {
+      std::cerr << "[HiFimapper::] Query " << q_id << " chaining started\n";
       if (!FindChains(matches[q_id], matches_complement[q_id], overlaps[q_id], secondary_alignements,
                       secondary_to_primary_ratio, gap, bandwidth, minimal_anchors)) {
         unmapped_ids[q_id] = true;
         ++unmapped;
       }
+      std::cerr << "[HiFimapper::] Query " << q_id << " chaining finished\n";
     }
 
     auto chaining_time = timer.Stop();
@@ -433,8 +439,11 @@ int main(int argc, char** argv) {
     for (auto& a : overlaps) {
       for (auto& o : a) {
         std::string strain = o.reversed ? "-" : "+";
-        std::cout << reads[o.query_id].Name() << "\t" << reads[o.query_id].size() << "\t" << 0 << "\t"
-                  << reads[o.query_id].size() - 1 << "\t" << strain << "\t" << references[o.target_id].Name() << "\t"
+        if (o.target_start_position == 0 && o.target_end_position == 0) {
+          continue;
+        }
+        std::cout << reads[o.query_id].Name() << "\t" << reads[o.query_id].size() << "\t" << o.query_start_position << "\t"
+                  << o.query_end_position << "\t" << strain << "\t" << references[o.target_id].Name() << "\t"
                   << references[o.target_id].size() << "\t" << o.target_start_position << "\t" << o.target_end_position
                   << "\t"
                   << "0"

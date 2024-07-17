@@ -92,7 +92,7 @@ std::vector<Overlap> Chain(std::vector<Match>& matches, const std::uint32_t gap,
   best_end_index = anchors_sorted[0];
   int included = 0;
 
-  while (best_end_index != -1 || included < secondary_alignements) {
+  while (best_end_index != -1 && included < secondary_alignements) {
     used[best_end_index] = true;
     int anchor_counter = 0;
     int best_start_index = best_end_index;
@@ -134,6 +134,9 @@ std::vector<Overlap> Chain(std::vector<Match>& matches, const std::uint32_t gap,
         break;
       }
     }
+
+    if (best_end_index == -1)
+      break;
 
     if (scores[best_end_index] <
         secondary_to_primary_ratio * scores[anchors_sorted[0]])

@@ -1,4 +1,5 @@
 #include "mapper/lcp.hpp"
+#include "mapper/suffix_array.hpp"
 
 namespace mapper {
 

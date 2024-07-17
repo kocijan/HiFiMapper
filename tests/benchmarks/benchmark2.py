@@ -16,7 +16,7 @@ def evalf(sample_length, sample_count):
         ref, reads, sample_count=sample_count, sample_length=sample_length,
         threads = 256, min_match=0, secondary_alignements = 1, minimal_anchors=1, discard=True, frequency=3)
     evalutor = PafEvaluator(str(resh), str(reads))
-    return [evalutor.correct / evalutor.total, int(resh.get_unmapped()), round(float(resh.get_mapping_time()), 2)]
+    return [evalutor.correct / (evalutor.total + 0.001), int(resh.get_unmapped()), round(float(resh.get_mapping_time()), 2)]
 
 
 print( 

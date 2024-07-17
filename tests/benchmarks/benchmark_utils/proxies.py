@@ -209,6 +209,9 @@ class ResultsHiFiMapper(ProxyObject):
 
         mapper = EXE_DIRECTORY.joinpath("mapper")
 
+        # TODO TODO TODO 
+        mapper = "/home/mjkocijan/hifimapper/HiFiMapper2/build/bin/mapper"
+
         cons_hash = hash_fixed(
             hash_str("Results"),
             hash_str(str(mapper)),
@@ -233,7 +236,9 @@ class ResultsHiFiMapper(ProxyObject):
                     secondary_to_primary_ratio,
                     lcp_search_size
         )
-
+        
+        # reads = "/home/mjkocijan/hifimapper/HiFiMapper/tests/benchmarks/data/sd_0001.fixed.limited.fastq"
+        # reads = "/home/mjkocijan/hifimapper/HiFiMapper/tests/benchmarks/data/sd_0001.fixed.fastq"
         results_name = str(cons_hash) + ".paf"
         descriptor_name = str(cons_hash) + "_stderr"
         path = RESULTS_DIRECTORY.joinpath(results_name)
@@ -253,9 +258,9 @@ class ResultsHiFiMapper(ProxyObject):
         command += f"{reference} "
         if reads is not None:
             command += str(reads)
-        print (command)
-        if not path.exists():
-            os.system(f"{command} > {path} 2> {descriptor_path}")
+        print (f"{command} > {path} 2> {descriptor_path}")
+        #if not path.exists(): # TODO
+        os.system(f"{command} > {path} 2> {descriptor_path}")
         try:
             if DEBUG and PROFILE:
                 os.system(
@@ -327,11 +332,16 @@ class ResultsMinimap2(ProxyObject):
 
         if reads is None:
             reads = reference
-
-        if not path.exists():
-            os.system(
-                f"{mapper} -x map-hifi -t {threads} -N {ssecondary_alignments} -p {min_ratio} {reference} {reads} > {path} 2> {descriptor_path}"
-            )
+        
+        # reads = "/home/mjkocijan/hifimapper/HiFiMapper/tests/benchmarks/data/sd_0001.fixed.limited.fastq"
+        # reads = "/home/mjkocijan/hifimapper/HiFiMapper/tests/benchmarks/data/sd_0001.fixed.fastq"
+        
+        command = f"{mapper} -x map-hifi -t {threads} -N {ssecondary_alignments} -p {min_ratio} {reference} {reads} > {path} 2> {descriptor_path}"
+        print (command)
+        #if not path.exists(): #TODO
+        os.system(command)
+        # else:
+        #     print(f"# {mapper} -x map-hifi -k 5 -f {format(filter, '.10f')} -t {threads} -N {ssecondary_alignments} -p {min_ratio} {reference} {reads} > {path} 2> {descriptor_path}")
 
         results_minimap2 = ResultsMinimap2(path)
         results_minimap2.descriptor_path = descriptor_path
@@ -371,19 +381,22 @@ class ResultsWinnowmap(ProxyObject):
         if reads is None:
             reads = reference
 
-        if not path.exists():
-            os.system(
-                f"{mapper_bin_directory}/meryl count k=15 output \
-            {mapper_bin_directory}/merylDB {reference} 2> /dev/null"
-            )
-            os.system(
-                f"{mapper_bin_directory}/meryl print greater-than distinct=0.9998 \
-            {mapper_bin_directory}/merylDB > {mapper_bin_directory}/repetitive_k15.txt 2> /dev/null"
-            )
-            os.system(
-                f"{mapper_bin_directory}/winnowmap -W {mapper_bin_directory}/repetitive_k15.txt \
-                -x map-pb -t {threads} {reference} {reads} > {path} 2> {descriptor_path}"
-            )
+        command = f"{mapper_bin_directory}/meryl count k=15 output \
+        {mapper_bin_directory}/merylDB {reference} 2> /dev/null"
+        #if not path.exists():
+        os.system(command)
+        print (command)
+        command = f"{mapper_bin_directory}/meryl print greater-than distinct=0.9998 \
+        {mapper_bin_directory}/merylDB > {mapper_bin_directory}/repetitive_k15.txt 2> /dev/null"
+        #if not path.exists():
+        os.system(command)
+        print (command)
+        command = f"{mapper_bin_directory}/winnowmap -W {mapper_bin_directory}/repetitive_k15.txt \
+            -x map-pb -t {threads} {reference} {reads} > {path} 2> {descriptor_path}"
+        #if not path.exists():
+        # TODO
+        os.system(command)
+        print (command)
 
         results_winnowmap = ResultsWinnowmap(path)
         results_winnowmap.descriptor_path = descriptor_path

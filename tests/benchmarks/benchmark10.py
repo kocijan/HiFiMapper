@@ -13,7 +13,8 @@ res,comm = ResultsHiFiMapper.create(
     ref, reads, sample_length=500, sample_count=20,
     threads = 256, min_match = 0.9, quality = 90, frequency = 75,
     discard = True, extended_search=True, sequential = True, lcp_information = False,
-    seed = 115, secondary_alignements = 1, minimal_anchors=1)
+    # seed = 115,
+    secondary_alignements = 1, minimal_anchors=1)
 evalutor = PafEvaluator(str(res), str(reads))
 evalutor.draw_corrcet_coverage(113566686, "images/chromosome13_correct_hifi.png")
 evalutor.draw_wrong_coverage(113566686, "images/chromosome13_wrong_hifi.png", ylim = 250)
@@ -28,11 +29,11 @@ evalutorm.draw_wrong_coverage(113566686, "images/chromosome13_wrong_minimap.png"
 data.append([comm, resm.get_time(), evalutorm.correct, evalutorm.wrong, evalutorm.unmapped])
 
 
-resw, comm = ResultsWinnowmap.create(ref, reads, threads = 256, min_ratio=1)
-evalutorw = PafEvaluator(str(resw), str(reads), filter_mappings=True)
-evalutorw.draw_corrcet_coverage(113566686, "images/chromosome13_correct_winnowmap.png")
-evalutorw.draw_wrong_coverage(113566686, "images/chromosome13_wrong_winnowmap.png", ylim = 250)
-data.append([comm, resw.get_time(), evalutorw.correct, evalutorw.wrong, evalutorw.unmapped])
+# resw, comm = ResultsWinnowmap.create(ref, reads, threads = 256, min_ratio=1)
+# evalutorw = PafEvaluator(str(resw), str(reads), filter_mappings=True)
+# evalutorw.draw_corrcet_coverage(113566686, "images/chromosome13_correct_winnowmap.png")
+# evalutorw.draw_wrong_coverage(113566686, "images/chromosome13_wrong_winnowmap.png", ylim = 250)
+# data.append([comm, resw.get_time(), evalutorw.correct, evalutorw.wrong, evalutorw.unmapped])
 
 
 print(compare_methods(data, tablefmt='latex'))

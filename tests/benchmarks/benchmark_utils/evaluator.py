@@ -104,8 +104,8 @@ class PafEvaluator:
             strain = Strand.POSITIVE if sp[7] == "+" else Strand.NEGATIVE
             best_result = 0
             for pline in self.paf_file.lines_by_query[qname]:
-                if pline.strand != strain:
-                    continue
+                # if pline.strand != strain:
+                #     continue
                 sim = _jaccard_sim(pline.target_start, pline.target_end, position, position + pline.query_length - 1)
                 if sim > best_result:
                     best_result = sim
@@ -137,8 +137,14 @@ class PafEvaluator:
 
         for qname in self.paf_file.lines_by_query:
             sp = qname.split("_")
-            position = int(sp[-1].lstrip("0") + "0") // 10
-            strain = Strand.POSITIVE if sp[-3] == "+" else Strand.NEGATIVE
+            try:
+                position = int(sp[-1].lstrip("0") + "0") // 10
+            except ValueError:
+                position = 0
+            try:
+                strain = Strand.POSITIVE if sp[-3] == "+" else Strand.NEGATIVE
+            except IndexError:
+                strain = Strand.POSITIVE
             if filter_mappings:
                 best = None
                 for pline in self.paf_file.lines_by_query[qname]:
@@ -149,15 +155,20 @@ class PafEvaluator:
             c = False
             for pline in self.paf_file.lines_by_query[qname]:
                 self.total += 1
-                if pline.strand != strain:
-                    self.wrong += 1
-                    continue
+                # if pline.strand != strain:
+                #     self.wrong += 1
+                #     continue
                 if _is_correct(pline.target_start, pline.target_end, position, position + pline.query_length - 1):
                     c = True
-                else:
-                    self.wrong += 1
+                # else:
+                #     self.wrong += 1
+                    #print("Wrong", pline.target_start, pline.target_end, position, position + pline.query_length - 1)
+                    #ovdje here TODO
             if c:
                 self.correct += 1
+            else:
+                self.wrong += 1
+                print("Wrong", qname, position, strain)
 
         fq = pyfastx.Fastx(reads)
         for name,seq,qual,comment in fq:
@@ -233,6 +244,39 @@ class PafEvaluator:
 
         plt.plot(x, res, color = 'red')
         fig.savefig(filename)
+    
+    def draw_coverage(self, reference_size, filename, ylim: int = None):
+        coverage_list = [0 for i in range (reference_size)]
+
+        for qname in self.paf_file.lines_by_query:
+            if len(self.paf_file.lines_by_query[qname]) > 1 :
+                print(qname)
+            for pline in self.paf_file.lines_by_query[qname]:
+                try:
+                    coverage_list[pline.target_start] += 1
+                    coverage_list[pline.target_end if pline.target_end < reference_size else reference_size - 1] -= 1
+                except Exception as e:
+                    print(pline.target_start, pline.target_end)
+                    print(e)
+        
+        res = []
+        suma = 0
+        for i in range (len(coverage_list)):
+            suma += coverage_list[i]
+            res.append(suma)
+            res.append(0)
+
+        x = []
+        for i in range(len(res)//2):
+            x.append(i)
+            x.append(i + 0.5)
+        
+        fig = plt.figure()
+        if ylim is not None:
+            plt.ylim(top=ylim)
+        plt.plot(x, res)
+        fig.savefig(filename)
+
 
 
 class RealEvaluator:

@@ -9,6 +9,9 @@ set(MAPPER_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cxx
 )
 
+set(CMAKE_BUILD_TYPE Debug)
+# set(CMAKE_BUILD_TYPE RelWithDebInfo)
+
 add_executable(mapper ${MAPPER_SOURCES})
 target_include_directories(mapper PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
@@ -22,4 +25,4 @@ target_link_libraries(mapper PRIVATE
 
 set_target_default_warnings(mapper PRIVATE FALSE)
 
-
+enable_testing()
